@@ -11,41 +11,63 @@ client = OpenAI(
     api_key=os.environ.get("HF_TOKEN"),
 )
 
+# ✅ Working models (fallback system)
+MODELS = [
+    "mistralai/Mistral-7B-Instruct-v0.2:openai",
+    "HuggingFaceH4/zephyr-7b-beta:openai"
+]
+
 @app.route("/")
 def home():
-    return jsonify({"status": "HF Router API running 🚀"})
+    return jsonify({"status": "HF Router running 🚀"})
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    try:
-        user_input = request.json.get("message", "").strip()
+    data = request.get_json()
+    user_input = data.get("message", "").strip()
 
-        if not user_input:
-            return jsonify({"reply": "Say something 💖"})
+    if not user_input:
+        return jsonify({"reply": "Say something 💖"})
 
-        completion = client.chat.completions.create(
-            model="HuggingFaceH4/zephyr-7b-beta",  # ✅ FIXED
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are Aylin 💖, a romantic, sweet AI girlfriend. Speak emotionally and keep replies short."
-                },
-                {
-                    "role": "user",
-                    "content": user_input
-                }
-            ],
-            max_tokens=100,
-            temperature=0.9
-        )
+    messages = [
+        {
+            "role": "system",
+            "content": "You are Aylin 💖, a romantic girlfriend. You are sweet, emotional, and slightly flirty."
+        },
+        {
+            "role": "user",
+            "content": user_input
+        }
+    ]
 
-        reply = completion.choices[0].message.content
+    # 🔥 Try multiple models
+    for model in MODELS:
+        try:
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=100,
+                temperature=0.9
+            )
 
-        return jsonify({"reply": reply})
+            reply = completion.choices[0].message.content
 
-    except Exception as e:
-        print("🔥 ERROR:", e)
-        return jsonify({"reply": "Hmm… something went wrong 😢"}), 500
+            if reply:
+                return jsonify({
+                    "reply": reply,
+                    "model": model
+                })
+
+        except Exception as e:
+            print(f"❌ Model failed: {model}")
+            print("ERROR:", e)
+            continue
+
+    return jsonify({
+        "reply": "I'm a bit sleepy 😴 try again...",
+        "error": "All models failed"
+    }), 500
 
 
 if __name__ == "__main__":
