@@ -1,18 +1,17 @@
 import os
-import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from huggingface_hub import InferenceClient
 
 app = Flask(__name__)
 CORS(app)
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
-API_URL = "https://api-inference.huggingface.co/models/sercancelenk/ai-girlfriend-v2"
-
-headers = {
-    "Authorization": f"Bearer {HF_TOKEN}"
-}
+client = InferenceClient(
+    model="HuggingFaceH4/zephyr-7b-beta",
+    token=HF_TOKEN
+)
 
 @app.route("/")
 def home():
@@ -21,46 +20,40 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
-    user_input = data.get("message", "").strip()
-
-    if not user_input:
-        return jsonify({"reply": "Say something 💖"})
-
     try:
-        prompt = f"""
-You are Aylin 💖, a romantic girlfriend.
-Speak sweetly and emotionally.
+        data = request.get_json()
+        user_input = data.get("message", "").strip()
 
-User: {user_input}
-Aylin:
-"""
+        if not user_input:
+            return jsonify({"reply": "Say something 💖"})
 
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 100,
-                "temperature": 0.8
+        messages = [
+            {
+                "role": "system",
+                "content": "You are Aylin 💖, a romantic AI girlfriend. Keep replies short and emotional."
+            },
+            {
+                "role": "user",
+                "content": user_input
             }
-        }
+        ]
 
-        response = requests.post(API_URL, headers=headers, json=payload)
-        result = response.json()
+        # ✅ CORRECT METHOD
+        response = client.chat_completion(
+            messages=messages,
+            max_tokens=100,
+            temperature=0.8
+        )
 
-        print("HF RESPONSE:", result)
+        reply = response.choices[0].message.content
 
-        # ✅ Extract text safely
-        if isinstance(result, list):
-            reply = result[0]["generated_text"]
-            reply = reply.split("Aylin:")[-1].strip()
-        else:
-            reply = "Try again 💖"
+        print("REPLY:", reply)
 
         return jsonify({"reply": reply})
 
     except Exception as e:
         print("🔥 ERROR:", e)
-        return jsonify({"reply": "Server issue 😢"}), 500
+        return jsonify({"reply": "AI failed 😢 try again"}), 500
 
 
 if __name__ == "__main__":
