@@ -13,8 +13,8 @@ client = OpenAI(
 
 # ✅ Working models (fallback system)
 MODELS = [
-    "mistralai/Mistral-7B-Instruct-v0.2:openai",
-    "HuggingFaceH4/zephyr-7b-beta:openai"
+    "Qwen/Qwen2.5-7B-Instruct:featherless-ai",
+    "HuggingFaceH4/zephyr-7b-beta:featherless-ai"
 ]
 
 @app.route("/")
