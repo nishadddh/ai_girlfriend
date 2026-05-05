@@ -8,7 +8,7 @@ CORS(app)
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
-API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+API_URL = "https://api-inference.huggingface.co/models/sercancelenk/ai-girlfriend-v2"
 
 headers = {
     "Authorization": f"Bearer {HF_TOKEN}"
