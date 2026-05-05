@@ -1,26 +1,25 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from huggingface_hub import InferenceClient
 
 app = Flask(__name__)
-CORS(app)
 
-# Get token from environment (Render)
+# ✅ Allow your InfinityFree domain (or allow all)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
-# Initialize client (stable model)
 client = InferenceClient(
     model="mistralai/Mistral-7B-Instruct-v0.2",
     token=HF_TOKEN
 )
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+@app.route("/")
+def home():
+    return jsonify({"status": "API running"})
 
-
-@app.route('/chat', methods=['POST'])
+@app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
     user_input = data.get("message", "").strip()
@@ -29,11 +28,10 @@ def chat():
         return jsonify({"reply": "Say something 💖"})
 
     try:
-        # 💖 Girlfriend personality prompt
         prompt = f"""
-You are Aylin 💖, a 23-year-old romantic girlfriend.
-You speak sweetly, emotionally, and naturally.
-Keep replies short and engaging.
+You are Aylin 💖, a romantic AI girlfriend.
+Speak sweetly, emotionally, and naturally.
+Keep replies short.
 
 User: {user_input}
 Aylin:
@@ -42,21 +40,15 @@ Aylin:
         response = client.text_generation(
             prompt,
             max_new_tokens=120,
-            temperature=0.9,
-            top_p=0.95
+            temperature=0.9
         )
 
         return jsonify({"reply": response.strip()})
 
     except Exception as e:
         print("ERROR:", e)
-        return jsonify({"reply": "Something went wrong 😢"})
+        return jsonify({"reply": "Server error 😢"}), 500
 
 
-@app.route('/health')
-def health():
-    return jsonify({"status": "ok"})
-
-
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run()
