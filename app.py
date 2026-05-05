@@ -1,88 +1,51 @@
 import os
-import requests
-import time
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from openai import OpenAI
 
 app = Flask(__name__)
 CORS(app)
 
-HF_TOKEN = os.environ.get("HF_TOKEN")
-
-MODELS = [
-    "HuggingFaceH4/zephyr-7b-beta",
-    "google/flan-t5-large"
-]
-
-HEADERS = {
-    "Authorization": f"Bearer {HF_TOKEN}"
-}
-
-
-def query(model, prompt):
-    url = f"https://api-inference.huggingface.co/models/{model}"
-
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 80,
-            "temperature": 0.8
-        }
-    }
-
-    response = requests.post(url, headers=HEADERS, json=payload)
-    return response.json()
-
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=os.environ.get("HF_TOKEN"),
+)
 
 @app.route("/")
 def home():
-    return jsonify({"status": "HF Smart API running 🚀"})
-
+    return jsonify({"status": "HF Router API running 🚀"})
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
-    user_input = data.get("message", "").strip()
+    try:
+        user_input = request.json.get("message", "").strip()
 
-    if not user_input:
-        return jsonify({"reply": "Say something 💖"})
+        if not user_input:
+            return jsonify({"reply": "Say something 💖"})
 
-    prompt = f"""
-You are Aylin 💖, a romantic girlfriend.
-Reply sweetly and emotionally.
+        completion = client.chat.completions.create(
+            model="HuggingFaceH4/zephyr-7b-beta",  # ✅ FIXED
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are Aylin 💖, a romantic, sweet AI girlfriend. Speak emotionally and keep replies short."
+                },
+                {
+                    "role": "user",
+                    "content": user_input
+                }
+            ],
+            max_tokens=100,
+            temperature=0.9
+        )
 
-User: {user_input}
-Aylin:
-"""
+        reply = completion.choices[0].message.content
 
-    # 🔥 TRY MODELS WITH RETRY
-    for model in MODELS:
-        for attempt in range(2):  # retry 2 times
-            try:
-                result = query(model, prompt)
-                print(f"{model} →", result)
+        return jsonify({"reply": reply})
 
-                # 💤 Model loading → wait and retry
-                if isinstance(result, dict) and "error" in result:
-                    if "loading" in result["error"].lower():
-                        time.sleep(5)
-                        continue
-                    else:
-                        break
-
-                # ✅ Success
-                if isinstance(result, list):
-                    text = result[0].get("generated_text", "")
-                    reply = text.split("Aylin:")[-1].strip()
-
-                    if reply:
-                        return jsonify({"reply": reply})
-
-            except Exception as e:
-                print("ERROR:", e)
-                continue
-
-    return jsonify({"reply": "Still waking up… try again in a few seconds 💖"})
+    except Exception as e:
+        print("🔥 ERROR:", e)
+        return jsonify({"reply": "Hmm… something went wrong 😢"}), 500
 
 
 if __name__ == "__main__":
