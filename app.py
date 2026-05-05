@@ -1,5 +1,6 @@
 import os
 import requests
+import time
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -8,11 +9,9 @@ CORS(app)
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
-# ✅ Try multiple free models
 MODELS = [
     "HuggingFaceH4/zephyr-7b-beta",
-    "google/flan-t5-large",
-    "facebook/blenderbot-400M-distill"
+    "google/flan-t5-large"
 ]
 
 HEADERS = {
@@ -20,8 +19,8 @@ HEADERS = {
 }
 
 
-def query_model(model, prompt):
-    API_URL = f"https://api-inference.huggingface.co/models/{model}"
+def query(model, prompt):
+    url = f"https://api-inference.huggingface.co/models/{model}"
 
     payload = {
         "inputs": prompt,
@@ -31,13 +30,13 @@ def query_model(model, prompt):
         }
     }
 
-    response = requests.post(API_URL, headers=HEADERS, json=payload)
+    response = requests.post(url, headers=HEADERS, json=payload)
     return response.json()
 
 
 @app.route("/")
 def home():
-    return jsonify({"status": "HF Multi-Model API running 🚀"})
+    return jsonify({"status": "HF Smart API running 🚀"})
 
 
 @app.route("/chat", methods=["POST"])
@@ -56,30 +55,34 @@ User: {user_input}
 Aylin:
 """
 
-    # 🔥 TRY MULTIPLE MODELS
+    # 🔥 TRY MODELS WITH RETRY
     for model in MODELS:
-        try:
-            result = query_model(model, prompt)
-            print(f"MODEL {model}:", result)
+        for attempt in range(2):  # retry 2 times
+            try:
+                result = query(model, prompt)
+                print(f"{model} →", result)
 
-            # ❌ model loading
-            if isinstance(result, dict) and "error" in result:
+                # 💤 Model loading → wait and retry
+                if isinstance(result, dict) and "error" in result:
+                    if "loading" in result["error"].lower():
+                        time.sleep(5)
+                        continue
+                    else:
+                        break
+
+                # ✅ Success
+                if isinstance(result, list):
+                    text = result[0].get("generated_text", "")
+                    reply = text.split("Aylin:")[-1].strip()
+
+                    if reply:
+                        return jsonify({"reply": reply})
+
+            except Exception as e:
+                print("ERROR:", e)
                 continue
 
-            # ✅ success
-            if isinstance(result, list):
-                text = result[0].get("generated_text", "")
-                reply = text.split("Aylin:")[-1].strip()
-
-                if reply:
-                    return jsonify({"reply": reply})
-
-        except Exception as e:
-            print("ERROR:", e)
-            continue
-
-    # ❌ if all fail
-    return jsonify({"reply": "I’m here… but a bit sleepy 😴 try again"})
+    return jsonify({"reply": "Still waking up… try again in a few seconds 💖"})
 
 
 if __name__ == "__main__":
