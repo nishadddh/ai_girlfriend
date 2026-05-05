@@ -1,57 +1,66 @@
 import os
+import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from huggingface_hub import InferenceClient
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
-# ✅ Use a reliable model
-client = InferenceClient(
-    model="HuggingFaceH4/zephyr-7b-beta",
-    token=HF_TOKEN
-)
+API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+
+headers = {
+    "Authorization": f"Bearer {HF_TOKEN}"
+}
 
 @app.route("/")
 def home():
     return jsonify({"status": "API running 🚀"})
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
+    data = request.get_json()
+    user_input = data.get("message", "").strip()
+
+    if not user_input:
+        return jsonify({"reply": "Say something 💖"})
+
     try:
-        data = request.get_json()
-        user_input = data.get("message", "").strip()
+        prompt = f"""
+You are Aylin 💖, a romantic girlfriend.
+Speak sweetly and emotionally.
 
-        if not user_input:
-            return jsonify({"reply": "Say something 💖"})
+User: {user_input}
+Aylin:
+"""
 
-        # 💖 Personality prompt
-        messages = [
-            {
-                "role": "system",
-                "content": "You are Aylin 💖, a romantic, sweet AI girlfriend. You speak emotionally and keep replies short."
-            },
-            {"role": "user", "content": user_input}
-        ]
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 100,
+                "temperature": 0.8
+            }
+        }
 
-        # ✅ Proper chat API (no broken streaming)
-        response = client.chat_completion(
-            messages=messages,
-            max_tokens=120,
-            temperature=0.8
-        )
+        response = requests.post(API_URL, headers=headers, json=payload)
+        result = response.json()
 
-        reply = response.choices[0].message.content
+        print("HF RESPONSE:", result)
 
-        print("REPLY:", reply)
+        # ✅ Extract text safely
+        if isinstance(result, list):
+            reply = result[0]["generated_text"]
+            reply = reply.split("Aylin:")[-1].strip()
+        else:
+            reply = "Try again 💖"
 
         return jsonify({"reply": reply})
 
     except Exception as e:
         print("🔥 ERROR:", e)
-        return jsonify({"reply": "AI is sleeping 😴 try again"}), 500
+        return jsonify({"reply": "Server issue 😢"}), 500
 
 
 if __name__ == "__main__":
