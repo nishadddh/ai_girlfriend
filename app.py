@@ -1,42 +1,47 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from huggingface_hub import InferenceClient
 
 app = Flask(__name__)
 CORS(app)
 
+# Get token from environment (Render)
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
-@app.route("/chat", methods=["POST"])
+# Initialize client (stable model)
+client = InferenceClient(
+    model="mistralai/Mistral-7B-Instruct-v0.2",
+    token=HF_TOKEN
+)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json()
-    user_message = data.get("message", "").strip()
+    user_input = data.get("message", "").strip()
 
-    if not user_message:
-        return jsonify({"error": "Message is required"}), 400
-
-    if not HF_TOKEN:
-        return jsonify({"error": "HF_TOKEN not configured"}), 500
+    if not user_input:
+        return jsonify({"reply": "Say something 💖"})
 
     try:
-        client = InferenceClient(
-            model="sercancelenk/ai-girlfriend-v2",
-            token=HF_TOKEN
-        )
-
-        # 🔥 Prompt engineering (important)
+        # 💖 Girlfriend personality prompt
         prompt = f"""
-You are a romantic, caring AI girlfriend.
+You are Aylin 💖, a 23-year-old romantic girlfriend.
 You speak sweetly, emotionally, and naturally.
+Keep replies short and engaging.
 
-User: {user_message}
-Girlfriend:
+User: {user_input}
+Aylin:
 """
 
         response = client.text_generation(
             prompt,
-            max_new_tokens=150,
+            max_new_tokens=120,
             temperature=0.9,
             top_p=0.95
         )
@@ -44,17 +49,14 @@ Girlfriend:
         return jsonify({"reply": response.strip()})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print("ERROR:", e)
+        return jsonify({"reply": "Something went wrong 😢"})
 
 
-@app.route("/", methods=["GET"])
+@app.route('/health')
 def health():
-    return jsonify({
-        "status": "ok",
-        "model": "sercancelenk/ai-girlfriend-v2"
-    })
+    return jsonify({"status": "ok"})
 
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+if __name__ == '__main__':
+    app.run(debug=True)
